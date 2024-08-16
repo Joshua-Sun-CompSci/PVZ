@@ -20,4 +20,4 @@ It's the classic Plants vs. Zombies game! You will need to plant plants to preve
    pip install pillow
 4. Run the game:
    ```bash
-   python main.py
+   python TP.py
