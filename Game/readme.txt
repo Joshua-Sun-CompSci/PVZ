@@ -1,4 +1,6 @@
-Project Name: Plants vs. Zombies
+Project Name: Plants vs. Zombies 
+
+Version: 1.1
 
 What it does: It's the classic Plants vs. Zombie game! You will need to plant plants to prevent zombies from eating your brains!
 
