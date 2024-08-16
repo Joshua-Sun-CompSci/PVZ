@@ -13,8 +13,11 @@ It's the classic Plants vs. Zombies game! You will need to plant plants to preve
    ```bash
    git clone https://github.com/Joshua-Sun-CompSci/PVZ.git
 2. Navigate to the project directory:
+   ```bash
    cd PVZ
 3. Install the required dependency using pip:
+   ```bash
    pip install pillow
 4. Run the game:
+   ```bash
    python main.py
