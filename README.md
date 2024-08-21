@@ -21,3 +21,5 @@ It's the classic Plants vs. Zombies game! You will need to plant plants to preve
 4. Run the game:
    ```bash
    python TP.py
+
+## Important note: Seems like the game runs faster on my windows computer, it is caused by the inconsistent time of the variable "timer_delay" in TP.py. More updates will be done to fix this issue.
