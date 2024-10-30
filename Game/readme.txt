@@ -11,4 +11,4 @@ How to run:
 
 Shortcut commands: Press "p" to pause the game when playing the game
 
-*Note that this program runs on different speed on different computers (might be because of GPU difference?), if it runs too fast/slow on your computer, try to adjust the 
+*Note that this program runs on different speed on different computers (might be because of GPU difference?), if it runs too fast/slow on your computer, try to adjust the global variables on top of TP.py
