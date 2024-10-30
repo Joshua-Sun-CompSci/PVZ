@@ -1,10 +1,16 @@
 # background = 1400 * 600
-# note: number "250" in code basically means 250ms; however, since python's timerDelay
-# is not precise, 250 is basically 1 second(1000ms) you can see in game.
-
 import math, copy, random
-
 from cmu_112_graphics import *
+
+#################################################
+# Global variables to fix bugs
+#################################################
+
+gameProgressOneSec = 500 # change this if game progress is weird, such as sun generating too fast or too slow
+coolDownOneSec = 40 # change this if cool down on plants feels weird
+moveCanvasAmount = 5 # change this if the canvas moves too fast when enter the game and when done selecting plants
+bulletSpeed = 4 # change this if the bullets move too fast or slow
+zombieMovingSpeed = 0.5 # change this if zombies move too fast or slow
 
 #################################################
 # OOPs
@@ -18,7 +24,7 @@ class Plants:
         self.damage = 1
         self.health = self.fullHealth = 6
         self.time = 0
-        self.cooldown = 200 # approx. 10 seconds
+        self.cooldown = 10 * coolDownOneSec # approx. 10 seconds
 
     def location(self, x, y):
         self.x = x
@@ -46,14 +52,14 @@ class Shooter(Plants):
         super().__init__()
         self.bullets = []
         self.attackSpeed = 1.5 # shoots every 1.5 seconds
-        self.time = self.attackSpeed * 250 # the plant is ready to shoot
+        self.time = self.attackSpeed * gameProgressOneSec # the plant is ready to shoot
         self.slowDown = 0 # default shooter does not slow down zombies
 
     # These functions are used by all shooter plants
     def timerFired(self, app):
         self.time += app.timerDelay
         for index in range(len(self.bullets)):
-            self.bullets[index] += 10            
+            self.bullets[index] += bulletSpeed            
             if self.bullets[0] >= 800: # first bullet out of range
                 self.bullets.pop(0)
                 break
@@ -62,14 +68,19 @@ class Shooter(Plants):
                 self.attack(app)
                 if len(self.bullets) != 0 and zombie.x - self.bullets[0] <= 20:
                     zombie.getAttacked(app, self.damage)
-                    # slow the zombie down in some cases(i.e. if the snow pea hits the zombie, slow the zombie down)
-                    zombie.dx += self.slowDown
+                    # slow the zombie down in some cases(e.g. if the snow pea hits the zombie, slow the zombie down)
+                    # this if statement makes sure zombie only gets slowed down if zombie is moving faster
+                    # than the slowdown rate
+                    if self.slowDown > (zombie.dx - zombie.fulldx):
+                        zombie.dx += self.slowDown
+                    if zombie.dx > 0: # make sure zombie never moves backwards
+                        zombie.dx = 0
                     # if they touch, the bullet disappear
                     self.bullets.pop(0)
 
     def attack(self, app):
         # attacks every self.attackSpeed seconds
-        if self.time >= self.attackSpeed * 250:
+        if self.time >= self.attackSpeed * gameProgressOneSec:
             self.bullets.append(self.x)
             self.time = 0
 
@@ -98,7 +109,7 @@ class Repeater(Shooter):
     def timerFired(self, app):
         self.time += app.timerDelay
         for index in range(len(self.bullets)):
-            self.bullets[index] += 10            
+            self.bullets[index] += bulletSpeed            
             if self.bullets[0] >= 800: # first bullet out of range
                 self.bullets.pop(0)
                 break
@@ -115,14 +126,14 @@ class Repeater(Shooter):
 
     def attack1(self, app):
         # attacks every self.attackSpeed*0.8 seconds
-        if self.time >= self.attackSpeed * 200:
+        if self.time >= self.attackSpeed * 0.8 * gameProgressOneSec:
             self.bullets.append(self.x)
             self.time = 0
             self.shoot = False
 
     def attack2(self, app):
         # attacks every self.attackSpeed*0.2 seconds
-        if self.time >= self.attackSpeed * 50:
+        if self.time >= self.attackSpeed * 0.2 * gameProgressOneSec:
             self.bullets.append(self.x)
             self.time = 0
             self.shoot = True
@@ -141,7 +152,7 @@ class Snowpea(Shooter):
     def __init__(self):
         super().__init__()
         self.cost = 175
-        self.slowDown = 0.3
+        self.slowDown = 0.3 * zombieMovingSpeed
 
     def drawPea(self, app, canvas):
         for x in self.bullets:
@@ -163,13 +174,13 @@ class Projectile(Plants):
         self.times = 4
         self.bullet = False
         self.attackSpeed = 3
-        self.time = self.attackSpeed * 250 # the plant is ready to shoot
+        self.time = self.attackSpeed * gameProgressOneSec # the plant is ready to shoot
 
     def timerFired(self, app):
         if self.bullet:
             self.getChanges(app)
             self.hitZombie(app)
-            if self.time >= self.attackSpeed * 250:
+            if self.time >= self.attackSpeed * gameProgressOneSec:
                 self.bullet = False # disappear if it didn't touch the zombie
         # get the first zombie at the same row
         else:
@@ -178,21 +189,20 @@ class Projectile(Plants):
         self.time += app.timerDelay
         for zombie in app.zombies:
                 if self.y - zombie.y == 25: # if the plant and the zombie is on the same row
-                    if self.time >= self.attackSpeed * 250:
+                    if self.time >= self.attackSpeed * gameProgressOneSec:
                         self.attack(app)
                         self.time = 0               
 
     # complex physics calculation(very complex!!!!! It took me 5 hours to figure it out!!)
     # numbers are based on the graphics layout
-    # the 125 as a denominator basically means it happens every half second
     # the *2, *4, etc. will basically make the parabola bigger
     # Every "self.times" is 171.8 pixels, and the times depend on self.distance
     # self.distance is the distance between the plant and the first zombie in the row
     def getChanges(self, app):
         v0 = (14.7 / math.sin(app.theta)) * 2
         self.times = self.distance / 171.8
-        self.bulletX = self.x + (v0 * self.time / 125) * math.cos(app.theta) * self.times
-        self.bulletY = self.y - ((v0 * math.sin(app.theta) * self.time / 125) - 0.5 * app.g * (self.time / 125) ** 2) * 4
+        self.bulletX = self.x + (v0 * self.time / (gameProgressOneSec * 0.5)) * math.cos(app.theta) * self.times
+        self.bulletY = self.y - ((v0 * math.sin(app.theta) * self.time / (gameProgressOneSec * 0.5)) - 0.5 * app.g * (self.time / (gameProgressOneSec * 0.5)) ** 2) * 4
 
     def attack(self, app):
         self.distance = 800 # reset self.distance
@@ -248,7 +258,7 @@ class KernelPult(Projectile):
                     self.distance = currDistance
         self.bullet = True
         # this deternmines what kernel pult shoots
-        butterChance = random.randint(1, 5) # 20% chance shooting butter
+        butterChance = random.randint(1, 4) # 25% chance shooting butter
         if butterChance == 1:
             self.bulletType = "Butter"
         else:
@@ -275,8 +285,7 @@ class Sun(Plants):
 
     def timerFired(self, app):
         self.time += app.timerDelay
-        # the time is weird, 250ms here is 1000ms shown on screen so just ignore the number
-        if self.time >= self.productionSpeed * 250:
+        if self.time >= self.productionSpeed * gameProgressOneSec:
             self.produce = True
             self.time = 0
             # reset the production speed between 15-24 seconds
@@ -296,7 +305,7 @@ class Sun(Plants):
 class Sunflower(Sun):
     def __init__(self):
         super().__init__()
-        self.cooldown = 100 # approx. 5 seconds
+        self.cooldown = 5 * coolDownOneSec # approx. 5 seconds
         self.cost = 50
         # it produces a sun between every 15-24 seconds
         self.productionSpeed = random.randint(15, 24)
@@ -316,7 +325,7 @@ class Sunflower(Sun):
 class Shield(Plants):
     def __init__(self):
         super().__init__()
-        self.cooldown = 600 # approx. 30 seconds
+        self.cooldown = 30 * coolDownOneSec # 30 seconds
 
 class Wallnut(Shield):
     def __init__(self):
@@ -336,7 +345,7 @@ class Zombies:
     def __init__(self):
         self.attack = False
         self.eatTime = 0
-        self.moveTime = 0
+        self.affectedTime = 0
 
     def getZombieLocation(self, app):
         # the zombie always pick the weakest row
@@ -379,7 +388,7 @@ class Zombies:
     @staticmethod
     def timerFired(app):
         app.zombieTime += app.timerDelay
-        if app.zombieTime >= app.nextGenTime * 250:
+        if app.zombieTime >= app.nextGenTime * gameProgressOneSec:
             Zombies.generateZombie(app)
 
             # update app.zombieInterval
@@ -426,11 +435,12 @@ class Zombies:
     def moveZombie(self, app):
         self.attackPlants(app)
         self.eatTime += app.timerDelay
-        self.moveTime += app.timerDelay
-        # reset the speed every 3 seconds
-        if self.moveTime >= 3 * 250:
+        if self.dx != self.fulldx:
+            self.affectedTime += app.timerDelay
+        # reset the speed every 3 seconds after slowdown
+        if self.affectedTime >= 3 * gameProgressOneSec:
             self.dx = self.fulldx
-            self.moveTime = 0
+            self.affectedTime = 0
 
         if self.attack == False:
             self.x += self.dx
@@ -444,9 +454,10 @@ class Zombies:
             # zombie and the plant are on the same row
             if row + 1 == self.row:
                 for plant in app.lawnPlants[row]:
-                    if plant != None and self.x - plant.x <= 40:
+                    # if self.dx == 0, meaning the zombie is freezed by a kernel pult
+                    if plant != None and self.x - plant.x <= 40 and self.dx != 0:
                         self.attack = True
-                        if self.eatTime >= 1 * 250: # zombie attacks every 1 second
+                        if self.eatTime >= 1 * gameProgressOneSec: # zombie attacks every 1 second
                             plant.getAttacked(app, self.damage)
                             self.eatTime = 0
                         return
@@ -478,7 +489,7 @@ class BrowncoatZombie(Zombies):
         super().__init__()
         self.damage = 1
         self.health = self.fullHealth = 10
-        self.dx = self.fulldx = -0.65
+        self.dx = self.fulldx = -0.65 * zombieMovingSpeed
 
     def drawZombie(self, app, canvas, x, y):
         canvas.create_image(x, y, image = getCachedPhotoImage(app, app.browncoatZombie))
@@ -488,7 +499,7 @@ class ConeheadZombie(Zombies):
         super().__init__()
         self.damage = 1
         self.health = self.fullHealth = 28
-        self.dx = self.fulldx = -0.65
+        self.dx = self.fulldx = -0.65 * zombieMovingSpeed
 
     def drawZombie(self, app, canvas, x, y):
         canvas.create_image(x, y, image = getCachedPhotoImage(app, app.coneheadZombie))
@@ -507,95 +518,95 @@ def getCachedPhotoImage(app, image):
 def appStarted(app):
     # whole background is 1400 * 600 pixels
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/3/38/Background1.jpg/revision/latest?cb=20160502033025
-    app.backgroundImage = app.loadImage("Background1.jpeg")
+    app.backgroundImage = app.loadImage("Game/Background1.jpeg")
 
     # load start page
     # url = https://tcrf.net/images/thumb/e/e9/PVZIOS_oldtitle.png/500px-PVZIOS_oldtitle.png
-    startPage = app.loadImage("StartPage.png")
+    startPage = app.loadImage("Game/StartPage.png")
     app.startPage = app.scaleImage(startPage, 8/5)
 
     # load pause page
     # It's a screenshot from pvz so there is no url
-    pausePage = app.loadImage("PausePage.png")
+    pausePage = app.loadImage("Game/PausePage.png")
     app.pausePage = app.scaleImage(pausePage, 1/4)
 
     # load plants' image
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/0/09/1769829-plant_peashooter_thumb.png/revision/latest/scale-to-width-down/183?cb=20200213115004
-    peashooter = app.loadImage("Peashooter.png")
+    peashooter = app.loadImage("Game/Peashooter.png")
     app.peashooter = app.scaleImage(peashooter, 1/3)
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/1/15/PeashooterSeedPacket.png/revision/latest?cb=20171030025422
-    app.peashooterCard = app.loadImage("PeashooterCard.png")
+    app.peashooterCard = app.loadImage("Game/PeashooterCard.png")
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/d/d2/Sunflower2009HD.png/revision/latest/scale-to-width-down/166?cb=20210727202431
-    sunflower = app.loadImage("Sunflower.png")
+    sunflower = app.loadImage("Game/Sunflower.png")
     app.sunflower = app.scaleImage(sunflower, 1/3)
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/8/81/SunflowerSeedPacket.png/revision/latest?cb=20171030030055
-    app.sunflowerCard = app.loadImage("SunflowerCard.png")
+    app.sunflowerCard = app.loadImage("Game/SunflowerCard.png")
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/7/77/PvZ1HDWallNut.png/revision/latest/scale-to-width-down/160?cb=20220404001152
-    wallnut = app.loadImage("Wallnut.png")
+    wallnut = app.loadImage("Game/Wallnut.png")
     app.wallnut = app.scaleImage(wallnut, 1/3)
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/4/4b/Wall-nutSeedPacket.png/revision/latest?cb=20171030031251
-    app.wallnutCard = app.loadImage("WallnutCard.png")
+    app.wallnutCard = app.loadImage("Game/WallnutCard.png")
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/a/a7/SP2009HD1.png/revision/latest/scale-to-width-down/250?cb=20170907050807
-    snowpea = app.loadImage("Snowpea.png")
+    snowpea = app.loadImage("Game/Snowpea.png")
     app.snowpea = app.scaleImage(snowpea, 1/3)
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/e/ed/SnowPeaSeedPacket.png/revision/latest?cb=20180103005826
-    app.snowpeaCard = app.loadImage("SnowpeaCard.png")
+    app.snowpeaCard = app.loadImage("Game/SnowpeaCard.png")
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/a/a9/RepeaterHD.png/revision/latest?cb=20171004061201
-    repeater = app.loadImage("Repeater.png")
+    repeater = app.loadImage("Game/Repeater.png")
     app.repeater = app.scaleImage(repeater, 2/5)
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/7/7a/RepeaterSeedPacket.png/revision/latest?cb=20171030033720
-    app.repeaterCard = app.loadImage("RepeaterCard.png")
+    app.repeaterCard = app.loadImage("Game/RepeaterCard.png")
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/e/eb/Kernel_Pult.png/revision/latest/scale-to-width-down/185?cb=20201226145323
-    kernelPult = app.loadImage("KernelPult.png")
+    kernelPult = app.loadImage("Game/KernelPult.png")
     app.kernelPult = app.scaleImage(kernelPult, 2/5)
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/4/46/Kernel-pultSeedPacket.png/revision/latest?cb=20171101052813
-    app.kernelPultCard = app.loadImage("KernelPultCard.png")
+    app.kernelPultCard = app.loadImage("Game/KernelPultCard.png")
 
     # load peas' image
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/7/7d/ProjectilePea.png/revision/latest?cb=20110415055741
-    app.pea = app.loadImage("Pea.png")
+    app.pea = app.loadImage("Game/Pea.png")
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/e/eb/ProjectileSnowPea.png/revision/latest?cb=20110331121534
-    app.frozenPea = app.loadImage("FrozenPea.png")
+    app.frozenPea = app.loadImage("Game/FrozenPea.png")
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/1/12/Cornpult_butter.png/revision/latest?cb=20110331062601
-    app.butter = app.loadImage("Butter.png")
+    app.butter = app.loadImage("Game/Butter.png")
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/0/06/Cornpult_kernal.png/revision/latest?cb=20110624205420
-    app.kernel = app.loadImage("Kernel.png")
+    app.kernel = app.loadImage("Game/Kernel.png")
 
 
     # load zombies' image
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/a/a6/ZombieHD.png/revision/latest/scale-to-width-down/115?cb=20141029062941
-    browncoatZombie = app.loadImage("Browncoat_Zombie.png")
+    browncoatZombie = app.loadImage("Game/Browncoat_Zombie.png")
     app.browncoatZombie = app.scaleImage(browncoatZombie, 16/25)
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/2/26/ConeHead_Zombie.png/revision/latest/scale-to-width-down/96?cb=20201226144523
-    coneheadZombie = app.loadImage("Conehead_Zombie.png")
+    coneheadZombie = app.loadImage("Game/Conehead_Zombie.png")
     app.coneheadZombie = app.scaleImage(coneheadZombie, 16/25)
 
     # load sun image
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/b/b8/Sun_PvZ2.png/revision/latest?cb=20160323031552
-    sun = app.loadImage("Sun.png")
+    sun = app.loadImage("Game/Sun.png")
     app.sun = app.scaleImage(sun, 1/3)
 
     # load game over image
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/d/d2/PvZ1ZombiesWon.png/revision/latest/scale-to-width-down/250?cb=20160123100344
-    zombiesWon = app.loadImage("ZombiesWon.png")
+    zombiesWon = app.loadImage("Game/ZombiesWon.png")
     app.zombiesWon = app.scaleImage(zombiesWon, 5/2)
 
     # load you win image
     # url = https://cdna.artstation.com/p/assets/images/images/017/557/322/large/marvic-yao-gameover.jpg?1556478404
-    playerWon = app.loadImage("PlayerWon.jpg")
+    playerWon = app.loadImage("Game/PlayerWon.jpg")
     app.playerWon = app.scaleImage(playerWon, 2/5)
 
     # load progress bar image
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/9/99/FlagMeter.png/revision/latest?cb=20160523010313
-    progressBar = app.loadImage("ProgressBar.png")
+    progressBar = app.loadImage("Game/ProgressBar.png")
     app.progressBar = progressBar.crop((0, 0, 158, 23))
 
     # load shovel image
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/f/f4/Shovel.jpg/revision/latest/smart/width/250/height/250?cb=20100319124445
-    shovel = app.loadImage("Shovel.jpg")
+    shovel = app.loadImage("Game/Shovel.jpg")
     app.shovel = app.scaleImage(shovel, 2/7)
     # url = https://static.wikia.nocookie.net/plantsvszombies/images/b/ba/Shovel2.png/revision/latest?cb=20120319163030
-    useShovel = app.loadImage("useShovel.png")
+    useShovel = app.loadImage("Game/useShovel.png")
     app.useShovel = app.scaleImage(useShovel, 2/3)
 
     startGame(app)
@@ -740,8 +751,8 @@ def stage1_timerFired(app):
     if app.croppedRight >= app.imageWidth:
         app.mode = "stage2"
         return
-    app.croppedLeft += 10
-    app.croppedRight += 10
+    app.croppedLeft += moveCanvasAmount
+    app.croppedRight += moveCanvasAmount
     app.croppedBackground = app.backgroundImage.crop((app.croppedLeft, 0, app.croppedRight, app.height))
 
 def stage1_drawBackground(app, canvas):
@@ -921,7 +932,7 @@ def stage2_drawStartButton(app, canvas):
                             app.buttonCx + app.buttonDx, app.buttonCy + app.buttonDy, 
                             fill = 'tomato3')
     canvas.create_text(app.buttonCx, app.buttonCy, text = 'LET\'S ROCK!', 
-                       fill = 'tomato4',font = 'Arial 20 bold')
+                       fill = 'tomato4',font = 'Arial 15 bold')
 
 def stage2_redrawAll(app, canvas):
     stage2_drawBackground(app, canvas)
@@ -944,8 +955,8 @@ background will not change anymore in the future
 def stage3_timerFired(app):
     if app.croppedLeft <= 220:
         app.mode = "stage4"
-    app.croppedLeft -= 10
-    app.croppedRight -= 10
+    app.croppedLeft -= moveCanvasAmount
+    app.croppedRight -= moveCanvasAmount
     app.croppedBackground = app.backgroundImage.crop((app.croppedLeft, 0, app.croppedRight, app.height))
 
 def stage3_drawSelectionBox(app, canvas):
@@ -995,7 +1006,7 @@ def stage4_timerFired(app):
     stage4_updateCooldown(app)
     Zombies.timerFired(app)
     app.gameTime += app.timerDelay
-    if app.gameTime % 250 == 0: # This changes the progress bar
+    if app.gameTime % gameProgressOneSec == 0: # This changes the progress bar
         app.leftX -= app.move
         if app.leftX <= 605:
             app.mode = "playerWon"
@@ -1119,7 +1130,7 @@ def stage4_getLawnBoxIndex(app, x, y):
 # A sun will fall from the sky every 5 seconds
 def stage4_dropSkySun(app):
     app.sunTime += app.timerDelay
-    if app.sunTime >= 5 * 250:
+    if app.sunTime >= 5 * gameProgressOneSec:
         app.isSun = True
         app.sunX = random.randint(50, 750)
         app.sunTime = 0
@@ -1136,7 +1147,7 @@ def stage4_isLost(app):
             app.mode = "zombiesWon"
 
 def stage4_isWin(app):
-    if app.gameTime >= app.winTime * 250: # if the user play for 5 minutes without losing
+    if app.gameTime >= app.winTime * gameProgressOneSec: # if the user play for 5 minutes without losing
         app.mode = "playerWon"
 
 def stage4_drawPausePage(app, canvas):
